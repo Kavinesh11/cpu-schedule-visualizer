@@ -1,4 +1,4 @@
-Follow these steps:
+Follow these steps to clone up and make a local version to yourself :
 
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
