@@ -67,6 +67,14 @@ const Statistics: React.FC<StatisticsProps> = ({ result }) => {
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
+  // Custom tooltip formatter that handles the different value types
+  const customTooltipFormatter = (value: any) => {
+    if (typeof value === 'number') {
+      return value.toFixed(2);
+    }
+    return value;
+  };
+
   return (
     <Card className="glass-panel w-full">
       <CardHeader>
@@ -123,7 +131,7 @@ const Statistics: React.FC<StatisticsProps> = ({ result }) => {
               <BarChart data={barData} margin={{ top: 10, right: 30, left: 20, bottom: 40 }}>
                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
                 <YAxis />
-                <Tooltip formatter={(value) => value.toFixed(2)} />
+                <Tooltip formatter={customTooltipFormatter} />
                 <Bar dataKey="value" fill="#8884d8">
                   {barData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -152,7 +160,7 @@ const Statistics: React.FC<StatisticsProps> = ({ result }) => {
                     <Cell key={`cell-${index}`} fill={index === 0 ? '#4ade80' : '#d1d5db'} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => value.toFixed(2) + '%'} />
+                <Tooltip formatter={customTooltipFormatter} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>

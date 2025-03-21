@@ -151,7 +151,9 @@ const StepByStepVisualization: React.FC<StepByStepVisualizationProps> = ({
                     <div 
                       className={`h-12 w-full flex items-center justify-center rounded-md border border-white/20 shadow-sm ${
                         item.processId !== null 
-                          ? (processes.find(p => p.id === item.processId)?.color || 'bg-gray-400')
+                          ? (runningProcess && runningProcess.id === item.processId 
+                              ? runningProcess.color 
+                              : completedProcesses.find(p => p.id === item.processId)?.color || 'bg-gray-400')
                           : 'bg-gray-200'
                       } ${isLast ? 'animate-pulse-subtle' : ''}`}
                     >
