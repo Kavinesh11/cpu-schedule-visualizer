@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Cpu, Play, Pause, FastForward, RotateCcw, Gauge } from 'lucide-react';
 import { Algorithm } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 interface AlgorithmSelectorProps {
   currentAlgorithm: Algorithm;
@@ -44,7 +44,6 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
     'Round Robin'
   ];
 
-  // Convert speed to more human-readable format
   const getSpeedLabel = (speed: number): string => {
     if (speed <= 300) return "Very Fast";
     if (speed <= 600) return "Fast";
@@ -52,11 +51,9 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
     if (speed <= 1500) return "Slow";
     return "Very Slow";
   };
-  
-  // Reverse the speed slider values to make it more intuitive
-  // Lower value on slider = faster animation (smaller delay)
+
   const speedValue = 2200 - visualizationSpeed;
-  
+
   return (
     <Card className="glass-panel w-full">
       <CardHeader>
