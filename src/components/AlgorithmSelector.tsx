@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,8 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
     return "Very Slow";
   };
 
-  const speedValue = 2200 - visualizationSpeed;
+  // Now the slider will be directly proportional to speed (higher value = faster)
+  const speedValue = visualizationSpeed;
 
   return (
     <Card className="glass-panel w-full">
@@ -116,17 +118,17 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
             </TooltipProvider>
           </div>
           <div className="flex space-x-2 items-center">
-            <span className="text-sm text-muted-foreground">Fast</span>
+            <span className="text-sm text-muted-foreground">Slow</span>
             <Slider
               value={[speedValue]}
               min={200}
               max={2000}
               step={100}
-              onValueChange={(value) => setVisualizationSpeed(2200 - value[0])}
+              onValueChange={(value) => setVisualizationSpeed(value[0])}
               disabled={isRunning && !isPaused}
               className="flex-grow"
             />
-            <span className="text-sm text-muted-foreground">Slow</span>
+            <span className="text-sm text-muted-foreground">Fast</span>
           </div>
         </div>
 
