@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Process, GanttItem, VisualizationState } from '@/types';
 import { Clock, PlayCircle, PauseCircle, SkipForward } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 interface StepByStepVisualizationProps {
   visualizationState: VisualizationState;
@@ -26,6 +27,25 @@ const StepByStepVisualization: React.FC<StepByStepVisualizationProps> = ({
   currentAlgorithm
 }) => {
   const { currentTime, runningProcess, readyQueue, completedProcesses, ganttChart } = visualizationState;
+  const lastRenderTimeRef = useRef<number>(Date.now());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to the latest Gantt chart item when updated
+  useEffect(() => {
+    if (ganttChart.length > 0 && containerRef.current) {
+      containerRef.current.scrollLeft = containerRef.current.scrollWidth;
+    }
+  }, [ganttChart.length]);
+
+  // Calculate progress for running process
+  const calculateProgress = () => {
+    if (!runningProcess || runningProcess.burst_time === undefined || runningProcess.remaining_time === undefined) {
+      return 0;
+    }
+    
+    const completed = runningProcess.burst_time - runningProcess.remaining_time;
+    return (completed / runningProcess.burst_time) * 100;
+  };
 
   return (
     <Card className="glass-panel w-full">
@@ -85,14 +105,22 @@ const StepByStepVisualization: React.FC<StepByStepVisualizationProps> = ({
               <span className="bg-primary/10 rounded-full w-6 h-6 inline-flex items-center justify-center mr-2 text-primary font-semibold">1</span>
               CPU Execution
             </h3>
-            <div className="bg-secondary/30 rounded-lg p-6 min-h-[120px] border border-secondary flex items-center justify-center">
+            <div className="bg-secondary/30 rounded-lg p-6 min-h-[150px] border border-secondary flex flex-col items-center justify-center">
               {runningProcess ? (
-                <div className={`${runningProcess.color} animate-pulse-subtle text-white font-medium px-6 py-4 rounded-md shadow-md`}>
+                <div className={`${runningProcess.color} w-full max-w-[280px] animate-pulse-subtle text-white font-medium px-6 py-4 rounded-md shadow-md`}>
                   <div className="text-center">
                     <div className="text-lg font-bold">Process P{runningProcess.id}</div>
-                    <div className="text-sm opacity-90">Executing...</div>
-                    <div className="mt-1 text-xs bg-black/20 px-2 py-1 rounded-full inline-block">
-                      Remaining: {runningProcess.remaining_time} units
+                    <div className="text-sm opacity-90 mb-2">Executing...</div>
+                    
+                    <Progress value={calculateProgress()} className="h-2 mb-2 bg-black/20" />
+                    
+                    <div className="flex justify-between text-xs">
+                      <div className="bg-black/20 px-2 py-1 rounded-full inline-block">
+                        Burst: {runningProcess.burst_time} units
+                      </div>
+                      <div className="bg-black/20 px-2 py-1 rounded-full inline-block">
+                        Remaining: {runningProcess.remaining_time} units
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -110,17 +138,20 @@ const StepByStepVisualization: React.FC<StepByStepVisualizationProps> = ({
               <span className="bg-primary/10 rounded-full w-6 h-6 inline-flex items-center justify-center mr-2 text-primary font-semibold">2</span>
               Ready Queue
             </h3>
-            <div className="bg-secondary/30 rounded-lg p-4 min-h-[120px] border border-secondary">
+            <div className="bg-secondary/30 rounded-lg p-4 min-h-[150px] border border-secondary">
               {readyQueue.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-2">
                   {readyQueue.map((process) => (
                     <div 
                       key={process.id}
-                      className={`${process.color} text-white font-medium px-3 py-2 rounded-md text-sm animate-pulse-subtle shadow-sm flex flex-col items-center`}
+                      className={`${process.color} text-white font-medium px-3 py-2 rounded-md text-sm shadow-sm flex flex-col items-center transition-transform hover:scale-105`}
                     >
                       <div>P{process.id}</div>
                       <div className="text-xs mt-1 bg-black/20 px-2 py-0.5 rounded-full">
                         Burst: {process.remaining_time}
+                      </div>
+                      <div className="text-xs mt-1 bg-black/20 px-2 py-0.5 rounded-full">
+                        Arrival: {process.arrival_time}
                       </div>
                     </div>
                   ))}
@@ -140,7 +171,7 @@ const StepByStepVisualization: React.FC<StepByStepVisualizationProps> = ({
             <span className="bg-primary/10 rounded-full w-6 h-6 inline-flex items-center justify-center mr-2 text-primary font-semibold">3</span>
             Real-time Gantt Chart
           </h3>
-          <div className="bg-secondary/30 rounded-lg p-4 border border-secondary overflow-x-auto">
+          <div className="bg-secondary/30 rounded-lg p-4 border border-secondary overflow-x-auto" ref={containerRef}>
             <div className="flex min-w-max">
               {ganttChart.map((item, index) => {
                 const width = Math.max(40, (item.endTime - item.startTime) * 30);
@@ -185,7 +216,7 @@ const StepByStepVisualization: React.FC<StepByStepVisualizationProps> = ({
                 {completedProcesses.map((process) => (
                   <div 
                     key={process.id}
-                    className={`${process.color} bg-opacity-80 text-white font-medium px-3 py-2 rounded-md text-sm shadow-sm flex items-center gap-2`}
+                    className={`${process.color} bg-opacity-80 text-white font-medium px-3 py-2 rounded-md text-sm shadow-sm flex items-center gap-2 transition-all hover:shadow-md`}
                   >
                     <div className="font-bold">P{process.id}</div>
                     <div className="text-xs bg-black/20 px-2 py-0.5 rounded-full">

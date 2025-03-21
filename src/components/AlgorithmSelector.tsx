@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Cpu, Play, Pause, FastForward, RotateCcw } from 'lucide-react';
+import { Cpu, Play, Pause, FastForward, RotateCcw, Gauge } from 'lucide-react';
 import { Algorithm } from '@/types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AlgorithmSelectorProps {
   currentAlgorithm: Algorithm;
@@ -43,6 +44,19 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
     'Round Robin'
   ];
 
+  // Convert speed to more human-readable format
+  const getSpeedLabel = (speed: number): string => {
+    if (speed <= 300) return "Very Fast";
+    if (speed <= 600) return "Fast";
+    if (speed <= 1000) return "Medium";
+    if (speed <= 1500) return "Slow";
+    return "Very Slow";
+  };
+  
+  // Reverse the speed slider values to make it more intuitive
+  // Lower value on slider = faster animation (smaller delay)
+  const speedValue = 2200 - visualizationSpeed;
+  
   return (
     <Card className="glass-panel w-full">
       <CardHeader>
@@ -86,19 +100,36 @@ const AlgorithmSelector: React.FC<AlgorithmSelectorProps> = ({
         )}
 
         <div className="space-y-2">
-          <Label>Visualization Speed</Label>
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-1">
+              <Gauge className="h-4 w-4" />
+              Visualization Speed
+            </Label>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="outline" className="bg-white/80">
+                    {getSpeedLabel(visualizationSpeed)}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Controls how fast the simulation runs (milliseconds between steps)</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <div className="flex space-x-2 items-center">
-            <span className="text-sm">Slow</span>
+            <span className="text-sm text-muted-foreground">Fast</span>
             <Slider
-              value={[visualizationSpeed]}
+              value={[speedValue]}
               min={200}
               max={2000}
               step={100}
-              onValueChange={(value) => setVisualizationSpeed(value[0])}
+              onValueChange={(value) => setVisualizationSpeed(2200 - value[0])}
               disabled={isRunning && !isPaused}
               className="flex-grow"
             />
-            <span className="text-sm">Fast</span>
+            <span className="text-sm text-muted-foreground">Slow</span>
           </div>
         </div>
 

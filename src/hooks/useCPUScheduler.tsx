@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Process, GanttItem, SchedulingResult, Algorithm, VisualizationState } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 
@@ -90,6 +90,60 @@ export const useCPUScheduler = () => {
   
   const animationFrameRef = useRef<number | null>(null);
   const skipVisualizationRef = useRef<boolean>(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear any existing timeouts when component unmounts or when speed changes
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [visualizationSpeed]);
+
+  // Helper function for pausing execution
+  const pauseExecution = async (): Promise<void> => {
+    if (isPaused) {
+      return new Promise<void>(resolve => {
+        const checkPause = () => {
+          if (!isPaused || skipVisualizationRef.current) {
+            resolve();
+          } else {
+            animationFrameRef.current = requestAnimationFrame(checkPause);
+          }
+        };
+        checkPause();
+      });
+    }
+  };
+
+  // Helper function for consistent delay
+  const delay = (ms: number): Promise<void> => {
+    return new Promise(resolve => {
+      timeoutRef.current = setTimeout(() => {
+        resolve();
+      }, ms);
+    });
+  };
+
+  // Helper function to update visualization state and apply appropriate delay
+  const updateVisualization = async (
+    newState: VisualizationState,
+    delayTime: number = visualizationSpeed,
+    isProcessing: boolean = false
+  ): Promise<void> => {
+    setVisualizationState(newState);
+    await pauseExecution();
+    
+    // Apply different delay times based on the action type
+    if (isProcessing) {
+      // Use full visualization speed for processing
+      await delay(delayTime);
+    } else {
+      // Use shorter delay for state updates
+      await delay(delayTime / 2);
+    }
+  };
 
   // FCFS Algorithm
   const runFCFS = async (): Promise<SchedulingResult> => {
@@ -122,7 +176,7 @@ export const useCPUScheduler = () => {
         });
         
         // Update visualization state for idle time
-        setVisualizationState({
+        await updateVisualization({
           currentTime,
           runningProcess: null,
           readyQueue: workingProcesses.filter(p => 
@@ -133,21 +187,7 @@ export const useCPUScheduler = () => {
           ganttChart: [...ganttChart]
         });
         
-        if (isPaused) {
-          await new Promise<void>(resolve => {
-            const checkPause = () => {
-              if (!isPaused || skipVisualizationRef.current) {
-                resolve();
-              } else {
-                animationFrameRef.current = requestAnimationFrame(checkPause);
-              }
-            };
-            checkPause();
-          });
-        }
-        
         currentTime = process.arrival_time;
-        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
       }
       
       // Process execution
@@ -161,28 +201,13 @@ export const useCPUScheduler = () => {
         .filter(p => p.arrival_time <= currentTime && !completedProcesses.includes(p) && p.id !== process.id);
       
       // Update visualization state before processing
-      setVisualizationState({
+      await updateVisualization({
         currentTime,
         runningProcess: process,
         readyQueue,
         completedProcesses: [...completedProcesses],
         ganttChart: [...ganttChart]
-      });
-      
-      if (isPaused) {
-        await new Promise<void>(resolve => {
-          const checkPause = () => {
-            if (!isPaused || skipVisualizationRef.current) {
-              resolve();
-            } else {
-              animationFrameRef.current = requestAnimationFrame(checkPause);
-            }
-          };
-          checkPause();
-        });
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
+      }, visualizationSpeed, true);
       
       currentTime += process.burst_time;
       
@@ -204,7 +229,7 @@ export const useCPUScheduler = () => {
       completedProcesses.push(process);
       
       // Update visualization state after processing
-      setVisualizationState({
+      await updateVisualization({
         currentTime,
         runningProcess: null,
         readyQueue: workingProcesses
@@ -212,8 +237,6 @@ export const useCPUScheduler = () => {
         completedProcesses: [...completedProcesses],
         ganttChart: [...ganttChart]
       });
-      
-      await new Promise(resolve => setTimeout(resolve, visualizationSpeed / 2));
     }
     
     // If we skipped visualization, calculate the full result without delays
@@ -900,6 +923,9 @@ export const useCPUScheduler = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
     }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
   };
 
   return {
@@ -923,4 +949,3 @@ export const useCPUScheduler = () => {
     cleanupAnimations
   };
 };
-
