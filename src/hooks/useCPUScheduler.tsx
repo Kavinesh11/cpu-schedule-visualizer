@@ -91,8 +91,6 @@ export const useCPUScheduler = () => {
   const animationFrameRef = useRef<number | null>(null);
   const skipVisualizationRef = useRef<boolean>(false);
 
-  // ... keep existing code for clone, calculate average, etc.
-
   // FCFS Algorithm
   const runFCFS = async (): Promise<SchedulingResult> => {
     const workingProcesses = cloneProcesses(processes)
@@ -922,4 +920,7 @@ export const useCPUScheduler = () => {
     setVisualizationSpeed,
     visualizationState,
     skipVisualization,
-    cleanup
+    cleanupAnimations
+  };
+};
+
