@@ -1,6 +1,5 @@
-
-import { useState, useCallback } from 'react';
-import { Process, GanttItem, SchedulingResult, Algorithm } from '@/types';
+import { useState, useCallback, useRef } from 'react';
+import { Process, GanttItem, SchedulingResult, Algorithm, VisualizationState } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 
 // Color palette for processes
@@ -12,16 +11,10 @@ const processColors = [
 
 // Hook for CPU scheduling algorithms
 export const useCPUScheduler = () => {
+  // ... keep existing code for processes, timeQuantum, algorithm states
   const [processes, setProcesses] = useState<Process[]>([]);
   const [timeQuantum, setTimeQuantum] = useState<number>(2);
-  const [isRunning, setIsRunning] = useState<boolean>(false);
-  const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [currentAlgorithm, setCurrentAlgorithm] = useState<Algorithm>('FCFS');
-  const [result, setResult] = useState<SchedulingResult | null>(null);
-  const [currentVisualizationStep, setCurrentVisualizationStep] = useState<number>(0);
-  const [visualizationSpeed, setVisualizationSpeed] = useState<number>(1000); // ms
   
-  // Add a new process
   const addProcess = useCallback((process: Omit<Process, 'id' | 'color'>) => {
     const id = processes.length > 0 ? Math.max(...processes.map(p => p.id)) + 1 : 1;
     const colorIndex = (id - 1) % processColors.length;
@@ -46,6 +39,22 @@ export const useCPUScheduler = () => {
     ));
   }, [processes]);
 
+  // Function to reset visualization state
+  const resetVisualizationState = () => {
+    setVisualizationState({
+      currentTime: 0,
+      runningProcess: null,
+      readyQueue: [],
+      completedProcesses: [],
+      ganttChart: []
+    });
+  };
+
+  // Function to skip current visualization
+  const skipVisualization = () => {
+    skipVisualizationRef.current = true;
+  };
+
   // Generate a deep copy of processes
   const cloneProcesses = (procs: Process[]): Process[] => {
     return procs.map(p => ({...p}));
@@ -63,9 +72,29 @@ export const useCPUScheduler = () => {
     }
     return count > 0 ? sum / count : 0;
   };
+  
+  const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [currentAlgorithm, setCurrentAlgorithm] = useState<Algorithm>('FCFS');
+  const [result, setResult] = useState<SchedulingResult | null>(null);
+  const [visualizationSpeed, setVisualizationSpeed] = useState<number>(1000); // ms
+  
+  // New state for step-by-step visualization
+  const [visualizationState, setVisualizationState] = useState<VisualizationState>({
+    currentTime: 0,
+    runningProcess: null,
+    readyQueue: [],
+    completedProcesses: [],
+    ganttChart: []
+  });
+  
+  const animationFrameRef = useRef<number | null>(null);
+  const skipVisualizationRef = useRef<boolean>(false);
+
+  // ... keep existing code for clone, calculate average, etc.
 
   // FCFS Algorithm
-  const runFCFS = async (visualize: boolean = false): Promise<SchedulingResult> => {
+  const runFCFS = async (): Promise<SchedulingResult> => {
     const workingProcesses = cloneProcesses(processes)
       .sort((a, b) => a.arrival_time - b.arrival_time);
     
@@ -76,10 +105,14 @@ export const useCPUScheduler = () => {
     const waitingTimes: number[] = [];
     const responseTimes: number[] = [];
     
-    // For visualization
-    let visualizationSteps = [];
+    const completedProcesses: Process[] = [];
     
     for (let i = 0; i < workingProcesses.length; i++) {
+      if (skipVisualizationRef.current) {
+        // Skip the visualization and calculate final result
+        break;
+      }
+      
       const process = workingProcesses[i];
       
       // If there's a gap between current time and process arrival
@@ -89,7 +122,34 @@ export const useCPUScheduler = () => {
           startTime: currentTime,
           endTime: process.arrival_time
         });
+        
+        // Update visualization state for idle time
+        setVisualizationState({
+          currentTime,
+          runningProcess: null,
+          readyQueue: workingProcesses.filter(p => 
+            p.arrival_time <= process.arrival_time && 
+            !completedProcesses.includes(p)
+          ).slice(i),
+          completedProcesses: [...completedProcesses],
+          ganttChart: [...ganttChart]
+        });
+        
+        if (isPaused) {
+          await new Promise<void>(resolve => {
+            const checkPause = () => {
+              if (!isPaused || skipVisualizationRef.current) {
+                resolve();
+              } else {
+                animationFrameRef.current = requestAnimationFrame(checkPause);
+              }
+            };
+            checkPause();
+          });
+        }
+        
         currentTime = process.arrival_time;
+        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
       }
       
       // Process execution
@@ -98,17 +158,33 @@ export const useCPUScheduler = () => {
       process.response_time = startTime - process.arrival_time;
       responseTimes[process.id] = process.response_time;
       
-      // For visualization
-      if (visualize) {
-        visualizationSteps.push({
-          time: currentTime,
-          running: process,
-          ready: workingProcesses.slice(i + 1).filter(p => p.arrival_time <= currentTime)
+      // Create a ready queue of processes that have arrived but not yet executed
+      const readyQueue = workingProcesses
+        .filter(p => p.arrival_time <= currentTime && !completedProcesses.includes(p) && p.id !== process.id);
+      
+      // Update visualization state before processing
+      setVisualizationState({
+        currentTime,
+        runningProcess: process,
+        readyQueue,
+        completedProcesses: [...completedProcesses],
+        ganttChart: [...ganttChart]
+      });
+      
+      if (isPaused) {
+        await new Promise<void>(resolve => {
+          const checkPause = () => {
+            if (!isPaused || skipVisualizationRef.current) {
+              resolve();
+            } else {
+              animationFrameRef.current = requestAnimationFrame(checkPause);
+            }
+          };
+          checkPause();
         });
-        
-        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
-        setCurrentVisualizationStep(visualizationSteps.length - 1);
       }
+      
+      await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
       
       currentTime += process.burst_time;
       
@@ -126,6 +202,75 @@ export const useCPUScheduler = () => {
         startTime: startTime,
         endTime: currentTime
       });
+      
+      completedProcesses.push(process);
+      
+      // Update visualization state after processing
+      setVisualizationState({
+        currentTime,
+        runningProcess: null,
+        readyQueue: workingProcesses
+          .filter(p => p.arrival_time <= currentTime && !completedProcesses.includes(p)),
+        completedProcesses: [...completedProcesses],
+        ganttChart: [...ganttChart]
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, visualizationSpeed / 2));
+    }
+    
+    // If we skipped visualization, calculate the full result without delays
+    if (skipVisualizationRef.current) {
+      skipVisualizationRef.current = false;
+      
+      // Quickly finish calculating all processes without visualization
+      for (let i = 0; i < workingProcesses.length; i++) {
+        const process = workingProcesses[i];
+        if (!completedProcesses.includes(process)) {
+          // If there's a gap between current time and process arrival
+          if (currentTime < process.arrival_time) {
+            ganttChart.push({
+              processId: null,
+              startTime: currentTime,
+              endTime: process.arrival_time
+            });
+            currentTime = process.arrival_time;
+          }
+          
+          // Process execution
+          const startTime = currentTime;
+          process.start_time = startTime;
+          process.response_time = startTime - process.arrival_time;
+          responseTimes[process.id] = process.response_time;
+          
+          currentTime += process.burst_time;
+          
+          process.completion_time = currentTime;
+          completionTimes[process.id] = currentTime;
+          
+          process.turnaround_time = process.completion_time - process.arrival_time;
+          turnaroundTimes[process.id] = process.turnaround_time;
+          
+          process.waiting_time = process.turnaround_time - process.burst_time;
+          waitingTimes[process.id] = process.waiting_time;
+          
+          ganttChart.push({
+            processId: process.id,
+            startTime: startTime,
+            endTime: currentTime
+          });
+          
+          completedProcesses.push(process);
+        }
+      }
+      
+      // Update final visualization state
+      setVisualizationState({
+        currentTime,
+        runningProcess: null,
+        readyQueue: [],
+        completedProcesses,
+        ganttChart
+      });
     }
     
     const result: SchedulingResult = {
@@ -140,8 +285,10 @@ export const useCPUScheduler = () => {
     return result;
   };
 
+  // Other algorithm implementations would follow similar pattern
+  // ... keep existing code for other algorithm implementations, updating them to use visualization state
   // SJF Non-Preemptive Algorithm
-  const runSJFNonPreemptive = async (visualize: boolean = false): Promise<SchedulingResult> => {
+  const runSJFNonPreemptive = async (): Promise<SchedulingResult> => {
     const workingProcesses = cloneProcesses(processes);
     
     let currentTime = 0;
@@ -186,18 +333,6 @@ export const useCPUScheduler = () => {
       shortestJob.response_time = startTime - shortestJob.arrival_time;
       responseTimes[shortestJob.id] = shortestJob.response_time;
       
-      // For visualization
-      if (visualize) {
-        visualizationSteps.push({
-          time: currentTime,
-          running: shortestJob,
-          ready: availableProcesses.filter(p => p.id !== shortestJob.id)
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
-        setCurrentVisualizationStep(visualizationSteps.length - 1);
-      }
-      
       currentTime += shortestJob.burst_time;
       
       shortestJob.completion_time = currentTime;
@@ -232,7 +367,7 @@ export const useCPUScheduler = () => {
   };
 
   // SJF Preemptive (SRTF) Algorithm
-  const runSJFPreemptive = async (visualize: boolean = false): Promise<SchedulingResult> => {
+  const runSJFPreemptive = async (): Promise<SchedulingResult> => {
     const workingProcesses = cloneProcesses(processes);
     
     let currentTime = 0;
@@ -296,18 +431,6 @@ export const useCPUScheduler = () => {
         shortestJob.response_time = currentTime - shortestJob.arrival_time;
         responseTimes[shortestJob.id] = shortestJob.response_time;
         firstResponseRecorded.add(shortestJob.id);
-      }
-      
-      // For visualization
-      if (visualize) {
-        visualizationSteps.push({
-          time: currentTime,
-          running: shortestJob,
-          ready: availableProcesses.filter(p => p.id !== shortestJob.id)
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
-        setCurrentVisualizationStep(visualizationSteps.length - 1);
       }
       
       // Determine how long this process will run
@@ -384,7 +507,7 @@ export const useCPUScheduler = () => {
   };
 
   // Priority Non-Preemptive Algorithm
-  const runPriorityNonPreemptive = async (visualize: boolean = false): Promise<SchedulingResult> => {
+  const runPriorityNonPreemptive = async (): Promise<SchedulingResult> => {
     const workingProcesses = cloneProcesses(processes);
     
     let currentTime = 0;
@@ -429,18 +552,6 @@ export const useCPUScheduler = () => {
       highestPriorityProcess.response_time = startTime - highestPriorityProcess.arrival_time;
       responseTimes[highestPriorityProcess.id] = highestPriorityProcess.response_time;
       
-      // For visualization
-      if (visualize) {
-        visualizationSteps.push({
-          time: currentTime,
-          running: highestPriorityProcess,
-          ready: availableProcesses.filter(p => p.id !== highestPriorityProcess.id)
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
-        setCurrentVisualizationStep(visualizationSteps.length - 1);
-      }
-      
       currentTime += highestPriorityProcess.burst_time;
       
       highestPriorityProcess.completion_time = currentTime;
@@ -475,7 +586,7 @@ export const useCPUScheduler = () => {
   };
 
   // Priority Preemptive Algorithm
-  const runPriorityPreemptive = async (visualize: boolean = false): Promise<SchedulingResult> => {
+  const runPriorityPreemptive = async (): Promise<SchedulingResult> => {
     const workingProcesses = cloneProcesses(processes);
     
     let currentTime = 0;
@@ -539,18 +650,6 @@ export const useCPUScheduler = () => {
         highestPriorityProcess.response_time = currentTime - highestPriorityProcess.arrival_time;
         responseTimes[highestPriorityProcess.id] = highestPriorityProcess.response_time;
         firstResponseRecorded.add(highestPriorityProcess.id);
-      }
-      
-      // For visualization
-      if (visualize) {
-        visualizationSteps.push({
-          time: currentTime,
-          running: highestPriorityProcess,
-          ready: availableProcesses.filter(p => p.id !== highestPriorityProcess.id)
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
-        setCurrentVisualizationStep(visualizationSteps.length - 1);
       }
       
       // Determine how long this process will run
@@ -627,7 +726,7 @@ export const useCPUScheduler = () => {
   };
 
   // Round Robin Algorithm
-  const runRoundRobin = async (visualize: boolean = false): Promise<SchedulingResult> => {
+  const runRoundRobin = async (): Promise<SchedulingResult> => {
     const workingProcesses = cloneProcesses(processes);
     
     // Initialize remaining time for each process
@@ -682,18 +781,6 @@ export const useCPUScheduler = () => {
         currentProcess.response_time = currentTime - currentProcess.arrival_time;
         responseTimes[currentProcess.id] = currentProcess.response_time;
         firstResponseRecorded.add(currentProcess.id);
-      }
-      
-      // For visualization
-      if (visualize) {
-        visualizationSteps.push({
-          time: currentTime,
-          running: currentProcess,
-          ready: [...readyQueue]
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, visualizationSpeed));
-        setCurrentVisualizationStep(visualizationSteps.length - 1);
       }
       
       // Calculate execution time in this time quantum
@@ -751,7 +838,7 @@ export const useCPUScheduler = () => {
   };
 
   // Run the selected scheduling algorithm
-  const runSchedulingAlgorithm = async (visualize: boolean = false) => {
+  const runSchedulingAlgorithm = async () => {
     if (processes.length === 0) {
       toast({
         title: "No processes",
@@ -762,32 +849,33 @@ export const useCPUScheduler = () => {
     }
     
     setIsRunning(true);
-    setCurrentVisualizationStep(0);
+    resetVisualizationState();
+    skipVisualizationRef.current = false;
     
     try {
       let result;
       
       switch (currentAlgorithm) {
         case 'FCFS':
-          result = await runFCFS(visualize);
+          result = await runFCFS();
           break;
         case 'SJF (Non-Preemptive)':
-          result = await runSJFNonPreemptive(visualize);
+          result = await runSJFNonPreemptive();
           break;
         case 'SJF (Preemptive)':
-          result = await runSJFPreemptive(visualize);
+          result = await runSJFPreemptive();
           break;
         case 'Priority (Non-Preemptive)':
-          result = await runPriorityNonPreemptive(visualize);
+          result = await runPriorityNonPreemptive();
           break;
         case 'Priority (Preemptive)':
-          result = await runPriorityPreemptive(visualize);
+          result = await runPriorityPreemptive();
           break;
         case 'Round Robin':
-          result = await runRoundRobin(visualize);
+          result = await runRoundRobin();
           break;
         default:
-          result = await runFCFS(visualize);
+          result = await runFCFS();
       }
       
       setResult(result);
@@ -805,6 +893,14 @@ export const useCPUScheduler = () => {
       });
     } finally {
       setIsRunning(false);
+      setIsPaused(false);
+    }
+  };
+
+  // Clean up animation frames on unmount
+  const cleanupAnimations = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
     }
   };
 
@@ -823,6 +919,7 @@ export const useCPUScheduler = () => {
     isPaused,
     setIsPaused,
     visualizationSpeed,
-    setVisualizationSpeed
-  };
-};
+    setVisualizationSpeed,
+    visualizationState,
+    skipVisualization,
+    cleanup

@@ -82,7 +82,7 @@
 
 @layer components {
   .glass-panel {
-    @apply bg-white/60 backdrop-blur-md border border-white/20 shadow-lg;
+    @apply bg-white/70 backdrop-blur-md border border-white/30 shadow-lg rounded-xl;
   }
   
   .process-item {
@@ -90,7 +90,7 @@
   }
   
   .gantt-box {
-    @apply relative inline-flex items-center justify-center h-12 text-sm font-medium text-white rounded-md mx-0.5 overflow-hidden;
+    @apply relative inline-flex items-center justify-center h-12 text-sm font-medium text-white rounded-md mx-0.5 overflow-hidden shadow-sm;
   }
   
   .gantt-box-left {
@@ -104,6 +104,42 @@
   .fitem {
     @apply inline-flex items-center justify-center px-3 py-1 text-sm font-medium rounded-md mx-1;
   }
+}
+
+/* Custom animations */
+@keyframes pulse-subtle {
+  0% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+}
+
+@keyframes process-running {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.animate-process-running {
+  animation: process-running 1.5s ease-in-out infinite;
 }
 
 .slide-enter {
@@ -126,4 +162,47 @@
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 300ms, transform 300ms;
+}
+
+/* Card transitions */
+.card-container {
+  transition: all 0.3s ease;
+}
+
+.card-container:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Process color variations - more vibrant */
+.process-blue {
+  @apply bg-blue-500 text-white;
+}
+
+.process-purple {
+  @apply bg-purple-500 text-white;
+}
+
+.process-pink {
+  @apply bg-pink-500 text-white;
+}
+
+.process-green {
+  @apply bg-green-500 text-white;
+}
+
+.process-yellow {
+  @apply bg-yellow-500 text-white;
+}
+
+.process-orange {
+  @apply bg-orange-500 text-white;
+}
+
+.process-red {
+  @apply bg-red-500 text-white;
+}
+
+.process-indigo {
+  @apply bg-indigo-500 text-white;
 }

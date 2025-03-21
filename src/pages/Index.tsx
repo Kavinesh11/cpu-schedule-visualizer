@@ -3,10 +3,9 @@ import React, { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import ProcessForm from '@/components/ProcessForm';
 import AlgorithmSelector from '@/components/AlgorithmSelector';
-import Visualization from '@/components/Visualization';
+import StepByStepVisualization from '@/components/StepByStepVisualization';
 import GanttChart from '@/components/GanttChart';
 import Statistics from '@/components/Statistics';
-import { Process } from '@/types';
 import { useCPUScheduler } from '@/hooks/useCPUScheduler';
 
 const Index = () => {
@@ -25,12 +24,11 @@ const Index = () => {
     isPaused,
     setIsPaused,
     visualizationSpeed,
-    setVisualizationSpeed
+    setVisualizationSpeed,
+    visualizationState,
+    skipVisualization,
+    cleanupAnimations
   } = useCPUScheduler();
-
-  const [currentRunningProcess, setCurrentRunningProcess] = useState<Process | null>(null);
-  const [readyQueue, setReadyQueue] = useState<Process[]>([]);
-  const [currentTime, setCurrentTime] = useState<number>(0);
   
   // Set up some example processes on first load
   useEffect(() => {
@@ -41,16 +39,12 @@ const Index = () => {
       addProcess({ arrival_time: 2, burst_time: 8, priority: 4 });
       addProcess({ arrival_time: 3, burst_time: 2, priority: 3 });
     }
+    
+    // Cleanup animations on unmount
+    return () => {
+      cleanupAnimations();
+    };
   }, []);
-
-  // Update visualization state when the scheduler is running
-  useEffect(() => {
-    if (result) {
-      // For now, we'll just display the final result
-      // The real-time visualization is handled in the scheduling algorithms
-      setCurrentTime(result.completionTime);
-    }
-  }, [result]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -80,10 +74,14 @@ const Index = () => {
         </div>
 
         {isRunning && (
-          <Visualization 
-            runningProcess={currentRunningProcess}
-            readyQueue={readyQueue}
-            currentTime={currentTime}
+          <StepByStepVisualization 
+            visualizationState={visualizationState}
+            onPause={() => setIsPaused(true)}
+            onResume={() => setIsPaused(false)}
+            onSkip={skipVisualization}
+            isPaused={isPaused}
+            isRunning={isRunning}
+            currentAlgorithm={currentAlgorithm}
           />
         )}
 
